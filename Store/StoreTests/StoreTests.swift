@@ -67,4 +67,11 @@ TOTAL: $7.97
 """
         XCTAssertEqual(expectedReceipt, receipt.output())
     }
+    
+//  MY TESTS
+    
+    func testOneItemSubtotal() {
+        register.scan(Item(name: "Cheetos (8oz Bag)", priceEach: 299))
+        XCTAssertEqual(299, register.subtotal())
+    }
 }
