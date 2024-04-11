@@ -35,6 +35,7 @@ Beans (8oz Can): $1.99
 ------------------
 TOTAL: $1.99
 """
+        print(receipt.output())
         XCTAssertEqual(expectedReceipt, receipt.output())
     }
     
