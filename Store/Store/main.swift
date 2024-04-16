@@ -9,6 +9,7 @@ import Foundation
 
 @objc protocol SKU  {
     var name : String { get }
+    var priceEach : Int { get set }
     func price() -> Int
     @objc optional func toString() -> String
 }
@@ -17,7 +18,7 @@ import Foundation
 class Item : NSObject, SKU {
     var name : String
     var weight : Double? = nil
-    private var priceEach : Int
+    var priceEach : Int
     
     init(name: String, priceEach: Int) {
         self.name = name
@@ -30,9 +31,10 @@ class Item : NSObject, SKU {
         self.weight = weight
     }
     
+    // If the calculated price of an item results in fractions of a penny, round using normal rounding rules (Round up >= .5, Round down < .5)
     func price() -> Int {
         if weight != nil {
-            return Int(Double(priceEach) * weight!)
+            return Int((Double(priceEach) * weight!).rounded())
         } else {
             return priceEach
         }
@@ -51,6 +53,7 @@ class Receipt {
     func items() -> [SKU] {
         return itemList
     }
+    
     private func priceToString(_ price: Int) -> String {
         let priceString : String = "$\(price / 100).\(price % 100)"
         return "\(priceString)"
@@ -77,28 +80,78 @@ class Receipt {
     }
 }
 
-class Register {
-    private var currentReceipt : Receipt
+// COUPONS ARE APPLIED BEFORE TAX
+class Coupon {
+    var itemName : String
+    var discount : Double = 0.15
     
-    init() {
-        currentReceipt = Receipt()
+    init (_ itemName: String) {
+        self.itemName = itemName
     }
     
+    init (_ itemName: String, _ discount: Double) {
+        self.itemName = itemName
+        self.discount = discount
+    }
+}
+
+class Register {
+    
+    private var currentReceipt : Receipt = Receipt()
+    private var coupons : [Coupon] = []
+
     func scan(_ sku: SKU) {
         currentReceipt.addItem(sku)
     }
     
+    func scanCoupon(_ coupon: Coupon) {
+        coupons.append(coupon)
+    }
+    
+    func applyCoupons() {
+    }
+    
+//  SUBTOTAL REFERS TO THE PRICE OF GOODS WHICH INCLUDES DISCOUNTS/COUPONS
+//  TAX NOT INCLUDED IN SUBTOTAL
     func subtotal() -> Int {
         var sum = 0
+        var usedCouponIndices : [Int] = []
         for item in currentReceipt.items() {
             sum += item.price()
+            for (index, coupon) in coupons.enumerated() {
+                if coupon.itemName == item.name && !usedCouponIndices.contains(index) {
+                    sum -= Int((Double(item.price()) * coupon.discount).rounded())
+                    usedCouponIndices.append(index)
+                    break
+                }
+            }
         }
         return sum
     }
     
+    private func finalSubtotal() -> Int {
+        var sum = 0
+        var usedCouponIndices : [Int] = []
+        for item in currentReceipt.items() {
+            sum += item.price()
+            for (index, coupon) in coupons.enumerated() {
+                if coupon.itemName == item.name && !usedCouponIndices.contains(index) {
+                    sum -= Int((Double(item.price()) * coupon.discount).rounded())
+                    usedCouponIndices.append(index)
+                    break
+                }
+            }
+        }
+        usedCouponIndices.sort(by: >)
+        for usedCouponIndex in usedCouponIndices {
+            coupons.remove(at: usedCouponIndex)
+        }
+        return sum
+    }
+    
+//  TOTAL REFERS TO THE ORDER TOTAL WHICH INCLUDES THINGS LIKE TAX, SHIPPING, FEES, TIPS, ETC
     func total() -> Receipt {
-        currentReceipt.totalCost = subtotal()
-//        2-1, coupons, tax, grouped
+        currentReceipt.totalCost = finalSubtotal()
         
         let orderReceipt = currentReceipt
         currentReceipt = Receipt()
